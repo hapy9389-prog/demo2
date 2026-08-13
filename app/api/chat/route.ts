@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCharacterById } from "@/lib/characters";
 import { chatWithCharacter } from "@/lib/claude";
-import { addMessage, addReminder, getRecentHistory } from "@/lib/store";
+import { addMessage, addReminder, findDuplicateReminder, getRecentHistory } from "@/lib/store";
 import { resolveTriggerTime, validateTriggerTime } from "@/lib/time";
 import { ChatResponse } from "@/types";
 
@@ -64,19 +64,37 @@ export async function POST(req: NextRequest) {
     const validation = validateTriggerTime(triggerAt, now);
 
     if (validation.ok) {
-      const reminder = addReminder({
+      const duplicate = findDuplicateReminder(
         characterId,
-        triggerAt: triggerAt.toISOString(),
-        originalPhrase: chatResult.extraction.original_phrase,
-        content: chatResult.extraction.content,
-        sourceMessageId: userMsg.id,
-      });
-      responseBody.reminderCreated = {
-        id: reminder.id,
-        content: reminder.content,
-        triggerAt: reminder.triggerAt,
-        originalPhrase: reminder.originalPhrase,
-      };
+        chatResult.extraction.content,
+        triggerAt,
+        now
+      );
+
+      if (duplicate) {
+        // Claude가 과거 대화의 리마인더 요청을 잘못 재해석해 재등록하려는 경우에 대한
+        // 서버 측 마지막 방어선. 조용히 무시한다 — 캐릭터의 채팅 답변 자체는 이미
+        // 자연스럽게 나갔으므로 사용자 경험이 끊기지는 않는다.
+        console.warn(
+          "[api/chat] 중복 리마인더로 판단해 생성 거부:",
+          duplicate.id,
+          chatResult.extraction
+        );
+      } else {
+        const reminder = addReminder({
+          characterId,
+          triggerAt: triggerAt.toISOString(),
+          originalPhrase: chatResult.extraction.original_phrase,
+          content: chatResult.extraction.content,
+          sourceMessageId: userMsg.id,
+        });
+        responseBody.reminderCreated = {
+          id: reminder.id,
+          content: reminder.content,
+          triggerAt: reminder.triggerAt,
+          originalPhrase: reminder.originalPhrase,
+        };
+      }
     } else {
       // 검증 실패(과거 시각/48시간 초과/형식 이상)면 조용히 리마인더를 만들지 않는다.
       // 캐릭터의 채팅 답변 자체는 이미 자연스럽게 나갔으므로 사용자 경험이 완전히 끊기진 않는다.

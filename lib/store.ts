@@ -140,6 +140,58 @@ export function updateReminderStatus(
   return reminder;
 }
 
+// 같은 characterId+content의 리마인더가 이미 pending/fired 상태로 있는데 새로
+// 계산된 triggerAt이 여기서 정한 오차 범위 안이면 "같은 걸 다시 등록하려는 것"으로 본다.
+const NEAR_DUPLICATE_TRIGGER_TOLERANCE_MS = 2 * 60 * 1000; // 2분
+// 또는 같은 characterId+content의 리마인더가 아주 최근(이 시간 이내)에 생성됐다면
+// triggerAt이 달라도 즉시 연속 재호출(예: 같은 응답 안 중복 tool_use, 순간 재전송)로 보고 막는다.
+const RECENT_DUPLICATE_CREATION_WINDOW_MS = 30 * 1000; // 30초
+
+function normalizeReminderContent(content: string): string {
+  return content.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * Claude가 과거 대화의 리마인더 요청을 잘못 재해석해 같은 리마인더를 다시 만들려는
+ * 경우를 잡아내는 서버 측 마지막 방어선(1차 방어는 tool description/system prompt).
+ * 같은 characterId + 정규화된 content가 일치하는 pending/fired 리마인더 중,
+ * (a) 새 triggerAt이 기존 것과 거의 같거나, (b) 기존 것이 아주 최근에 생성됐다면
+ * 중복으로 판단해 그 기존 리마인더를 반환한다(없으면 null = 중복 아님, 생성 진행).
+ *
+ * 사용자가 "다시 알려줘"처럼 명시적으로 새 시간을 지정하면 새 triggerAt이 기존
+ * 것과 충분히 달라지므로 이 검사에 걸리지 않고 정상적으로 새 리마인더가 만들어진다.
+ */
+export function findDuplicateReminder(
+  characterId: string,
+  content: string,
+  triggerAt: Date,
+  now: Date = new Date()
+): Reminder | null {
+  const normalized = normalizeReminderContent(content);
+  const candidates = getStore().reminders.filter(
+    (r) =>
+      r.characterId === characterId &&
+      (r.status === "pending" || r.status === "fired") &&
+      normalizeReminderContent(r.content) === normalized
+  );
+
+  for (const existing of candidates) {
+    const triggerDiffMs = Math.abs(
+      new Date(existing.triggerAt).getTime() - triggerAt.getTime()
+    );
+    const existingCreatedAgoMs = now.getTime() - new Date(existing.createdAt).getTime();
+
+    if (
+      triggerDiffMs <= NEAR_DUPLICATE_TRIGGER_TOLERANCE_MS ||
+      existingCreatedAgoMs <= RECENT_DUPLICATE_CREATION_WINDOW_MS
+    ) {
+      return existing;
+    }
+  }
+
+  return null;
+}
+
 export type DeleteReminderResult =
   | { ok: true }
   | { ok: false; reason: "not_found" | "not_pending" };
