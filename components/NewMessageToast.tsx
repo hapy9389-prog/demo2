@@ -2,8 +2,11 @@
 
 export function NewMessageToast({ text }: { text: string }) {
   return (
-    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-message-in rounded-full bg-neutral-900 px-5 py-2.5 text-sm text-white shadow-lg">
-      {text}
+    <div className="pointer-events-none absolute inset-x-0 bottom-24 z-50 flex justify-center px-4">
+      <div className="animate-message-in flex items-center gap-1.5 rounded-full bg-rose-600 px-4 py-2.5 text-xs font-medium text-white shadow-lg">
+        <span>🔔</span>
+        <span>{text}</span>
+      </div>
     </div>
   );
 }

@@ -45,6 +45,9 @@ export const CHARACTERS: Character[] = [
     id: "tsundere",
     name: "레이",
     emoji: "😤",
+    // public/characters/rei.png를 넣어두면 자동으로 이 이미지가 우선 표시된다(없으면 emoji 폴백).
+    image: "/characters/rei.png",
+    accent: "blue",
     tagline: "퉁명스럽지만 챙겨주는 츤데레",
     systemPrompt: TSUNDERE_PROMPT,
   },
@@ -52,6 +55,9 @@ export const CHARACTERS: Character[] = [
     id: "yandere",
     name: "유이",
     emoji: "💗",
+    // public/characters/yui.png를 넣어두면 자동으로 이 이미지가 우선 표시된다(없으면 emoji 폴백).
+    image: "/characters/yui.png",
+    accent: "rose",
     tagline: "다정하고 세심하게 챙기는 얀데레",
     systemPrompt: YANDERE_PROMPT,
   },

@@ -42,3 +42,46 @@ body {
 .animate-message-in {
   animation: message-in 0.25s ease-out;
 }
+
+/* 리마인더 발화 메시지처럼 "캐릭터가 먼저 연락했다"는 느낌을 더 강조하고 싶을 때. */
+@keyframes message-in-strong {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-message-in-strong {
+  animation: message-in-strong 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* 리마인더 바텀시트가 아래에서 위로 슬라이드업. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-sheet-up {
+  animation: sheet-up 0.25s ease-out;
+}

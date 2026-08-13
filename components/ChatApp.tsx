@@ -1,19 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHARACTERS, DEFAULT_CHARACTER_ID, getCharacterById } from "@/lib/characters";
 import { formatKoreanTime } from "@/lib/time";
-import { ChatResponse, Message, ReminderWithCharacter } from "@/types";
-import { CharacterSwitcher } from "./CharacterSwitcher";
+import { ChatResponse, Message, ReminderCardItem, ReminderWithCharacter } from "@/types";
 import { ChatWindow } from "./ChatWindow";
+import { HomeScreen, HomeRow } from "./HomeScreen";
 import { NewMessageToast } from "./NewMessageToast";
-import { ReminderCreatedBanner } from "./ReminderCreatedBanner";
 import { ReminderPanel } from "./ReminderPanel";
 
 const POLL_INTERVAL_MS = 3000;
 const DEFAULT_TITLE = "현실 시간과 연결되는 AI 캐릭터 채팅";
 const TOAST_DURATION_MS = 3000;
-const BANNER_DURATION_MS = 5000;
+
+type View = "home" | "chat";
 
 function mergeMessages(prev: Message[], incoming: Message[]): Message[] {
   if (incoming.length === 0) return prev;
@@ -23,15 +23,18 @@ function mergeMessages(prev: Message[], incoming: Message[]): Message[] {
 }
 
 export function ChatApp() {
+  const [view, setView] = useState<View>("home");
   const [activeCharacterId, setActiveCharacterId] = useState(DEFAULT_CHARACTER_ID);
   const [allMessages, setAllMessages] = useState<Message[]>([]);
+  const [reminderCards, setReminderCards] = useState<ReminderCardItem[]>([]);
   const [reminders, setReminders] = useState<ReminderWithCharacter[]>([]);
+  const [reminderSheetOpen, setReminderSheetOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [banner, setBanner] = useState<{ content: string; timeLabel: string } | null>(
-    null
-  );
   const [toast, setToast] = useState<string | null>(null);
+  // 홈 화면 행에 "아직 안 열어본 새 리마인더 발화가 있다"는 점을 찍기 위한 최소 버전
+  // (핵심 UI가 먼저이므로, 상태 하나만 추가하는 선에서 최소 구현)
+  const [unreadCharacterIds, setUnreadCharacterIds] = useState<Set<string>>(new Set());
 
   // 마지막으로 확인한 메시지의 서버 createdAt. 클라이언트 시계가 아니라 서버가 준
   // 값을 기준으로 폴링해야 서버-클라이언트 시계 오차에 영향을 받지 않는다.
@@ -39,7 +42,6 @@ export function ChatApp() {
   const initializedRef = useRef(false);
   const titleTimerRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
-  const bannerTimerRef = useRef<number | null>(null);
 
   const refreshReminders = useCallback(async () => {
     try {
@@ -65,12 +67,6 @@ export function ChatApp() {
     toastTimerRef.current = window.setTimeout(() => setToast(null), TOAST_DURATION_MS);
   }, []);
 
-  const showBanner = useCallback((content: string, timeLabel: string) => {
-    setBanner({ content, timeLabel });
-    if (bannerTimerRef.current) window.clearTimeout(bannerTimerRef.current);
-    bannerTimerRef.current = window.setTimeout(() => setBanner(null), BANNER_DURATION_MS);
-  }, []);
-
   // 최초 로드: 지금까지의 전체 대화 이력 + 리마인더 목록을 한 번에 가져온다.
   // 이후 캐릭터를 전환해도 재요청 없이 이 배열을 클라이언트에서 필터링만 하면 된다
   // (폴링이 모든 캐릭터의 신규 메시지를 계속 채워주기 때문).
@@ -93,9 +89,9 @@ export function ChatApp() {
     })();
   }, [refreshReminders]);
 
-  // 폴링: 활성 캐릭터와 무관하게 전체 신규 메시지를 감지한다.
+  // 폴링: 활성 캐릭터/화면과 무관하게 전체 신규 메시지를 감지한다.
   // 리마인더 발화 메시지는 등록 당시 캐릭터로 고정되어 오므로, 사용자가 다른
-  // 캐릭터를 보고 있어도 토스트/탭 제목으로 알아챌 수 있다.
+  // 캐릭터를 보고 있거나 홈 화면에 있어도 토스트/탭 제목/미확인 점으로 알아챌 수 있다.
   useEffect(() => {
     const interval = window.setInterval(async () => {
       try {
@@ -114,6 +110,12 @@ export function ChatApp() {
             const name = character?.name ?? "캐릭터";
             showToast(`${name}에게 새 메시지가 왔습니다`);
             flashTitleFor(name);
+
+            const isViewingThisCharacter =
+              view === "chat" && activeCharacterId === reminderMsg.characterId;
+            if (!isViewingThisCharacter) {
+              setUnreadCharacterIds((prev) => new Set(prev).add(reminderMsg.characterId));
+            }
           }
           refreshReminders();
         }
@@ -123,13 +125,12 @@ export function ChatApp() {
     }, POLL_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [flashTitleFor, refreshReminders, showToast]);
+  }, [activeCharacterId, flashTitleFor, refreshReminders, showToast, view]);
 
   useEffect(() => {
     return () => {
       if (titleTimerRef.current) window.clearTimeout(titleTimerRef.current);
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-      if (bannerTimerRef.current) window.clearTimeout(bannerTimerRef.current);
     };
   }, []);
 
@@ -152,10 +153,18 @@ export function ChatApp() {
         }
 
         if (data.reminderCreated) {
-          showBanner(
-            data.reminderCreated.content,
-            formatKoreanTime(new Date(data.reminderCreated.triggerAt))
-          );
+          // 임시 배너 대신, 채팅 스크롤에 영구히 남는 인라인 시스템 카드로 추가한다.
+          setReminderCards((prev) => [
+            ...prev,
+            {
+              id: data.reminderCreated!.id,
+              characterId: activeCharacterId,
+              content: data.reminderCreated!.content,
+              timeLabel: formatKoreanTime(new Date(data.reminderCreated!.triggerAt)),
+              originalPhrase: data.reminderCreated!.originalPhrase,
+              createdAt: data.reply.createdAt,
+            },
+          ]);
           refreshReminders();
         }
       } catch (err) {
@@ -164,7 +173,7 @@ export function ChatApp() {
         setSending(false);
       }
     },
-    [activeCharacterId, refreshReminders, showBanner]
+    [activeCharacterId, refreshReminders]
   );
 
   const handleDeleteReminder = useCallback(async (id: string) => {
@@ -180,39 +189,71 @@ export function ChatApp() {
     }
   }, []);
 
+  const handleSelectCharacter = useCallback((id: string) => {
+    setActiveCharacterId(id);
+    setView("chat");
+    setError(null);
+    setUnreadCharacterIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
   const activeCharacter = getCharacterById(activeCharacterId) ?? CHARACTERS[0];
   const activeMessages = allMessages.filter((m) => m.characterId === activeCharacterId);
+  const activeReminderCards = reminderCards.filter(
+    (c) => c.characterId === activeCharacterId
+  );
+
+  const homeRows: HomeRow[] = useMemo(
+    () =>
+      CHARACTERS.map((character) => {
+        const characterMessages = allMessages.filter((m) => m.characterId === character.id);
+        return {
+          character,
+          lastMessage: characterMessages[characterMessages.length - 1],
+          unread: unreadCharacterIds.has(character.id),
+        };
+      }),
+    [allMessages, unreadCharacterIds]
+  );
+
+  const pendingReminderCount = reminders.filter((r) => r.status === "pending").length;
 
   return (
-    <div className="flex h-screen flex-col">
-      <CharacterSwitcher
-        characters={CHARACTERS}
-        activeCharacterId={activeCharacterId}
-        onSelect={(id) => {
-          setActiveCharacterId(id);
-          setError(null);
-        }}
-      />
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-h-0 flex-1 flex-col">
-          {banner && (
-            <ReminderCreatedBanner
-              content={banner.content}
-              timeLabel={banner.timeLabel}
-              onDismiss={() => setBanner(null)}
-            />
-          )}
+    <div className="min-h-screen w-full bg-white sm:flex sm:items-center sm:justify-center sm:bg-neutral-200 sm:p-6">
+      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-[844px] sm:max-h-[92vh] sm:max-w-[420px] sm:rounded-[2.5rem] sm:border-[8px] sm:border-neutral-900 sm:shadow-2xl">
+        {view === "home" ? (
+          <HomeScreen
+            rows={homeRows}
+            pendingReminderCount={pendingReminderCount}
+            onSelect={handleSelectCharacter}
+            onOpenReminders={() => setReminderSheetOpen(true)}
+          />
+        ) : (
           <ChatWindow
             character={activeCharacter}
             messages={activeMessages}
+            reminderCards={activeReminderCards}
             onSend={handleSend}
             sending={sending}
             error={error}
+            onBack={() => setView("home")}
+            onOpenReminders={() => setReminderSheetOpen(true)}
           />
-        </div>
-        <ReminderPanel reminders={reminders} onDelete={handleDeleteReminder} />
+        )}
+
+        <ReminderPanel
+          open={reminderSheetOpen}
+          reminders={reminders}
+          onClose={() => setReminderSheetOpen(false)}
+          onDelete={handleDeleteReminder}
+        />
+
+        {toast && <NewMessageToast text={toast} />}
       </div>
-      {toast && <NewMessageToast text={toast} />}
     </div>
   );
 }

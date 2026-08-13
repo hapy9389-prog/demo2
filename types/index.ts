@@ -52,13 +52,36 @@ export type ReminderExtraction =
       content: string;
     };
 
+export type CharacterAccent = "blue" | "rose";
+
 export interface Character {
   id: string;
   name: string;
+  /** 이미지가 없거나 로드 실패 시 Avatar가 자동으로 폴백하는 이모지 */
   emoji: string;
-  /** 한 줄 소개 - UI의 캐릭터 전환 버튼 등에 사용 */
+  /**
+   * 실제 캐릭터 이미지 경로(예: "/characters/rei.png", public/characters/ 아래).
+   * 지정돼 있어도 파일이 없으면 Avatar 컴포넌트가 onError로 감지해 emoji로 폴백한다.
+   */
+  image?: string;
+  /** 아바타 폴백(이모지) 배경색 테마 - 캐릭터별 방 구분용 */
+  accent: CharacterAccent;
+  /** 한 줄 소개 - 채팅 헤더의 상태 문구 등에 사용 */
   tagline: string;
   systemPrompt: string;
+}
+
+/**
+ * 리마인더 등록 확인 카드(ReminderSystemCard)를 채팅 스크롤에 렌더링하기 위한
+ * 클라이언트 전용 항목. 서버에 저장되지 않으므로 새로고침하면 사라진다 — MVP 트레이드오프.
+ */
+export interface ReminderCardItem {
+  id: string;
+  characterId: string;
+  content: string;
+  timeLabel: string;
+  originalPhrase: string;
+  createdAt: string;
 }
 
 /** GET /api/reminders 응답 항목 - 표시용으로 캐릭터 이름/이모지를 덧붙인 형태 */
