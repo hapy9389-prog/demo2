@@ -1,7 +1,7 @@
 "use client";
 
 import { ReminderStatus, ReminderWithCharacter } from "@/types";
-import { formatKoreanTime } from "@/lib/time";
+import { formatReminderTime } from "@/lib/time";
 
 const STATUS_LABEL: Record<ReminderStatus, string> = {
   pending: "예정",
@@ -75,7 +75,7 @@ export function ReminderPanel({
               </div>
               <p className="mt-1.5 text-neutral-800">{r.content}</p>
               <p className="mt-0.5 text-neutral-400">
-                {formatKoreanTime(new Date(r.triggerAt))} · &quot;{r.originalPhrase}&quot;
+                {formatReminderTime(new Date(r.triggerAt))} · &quot;{r.originalPhrase}&quot;
               </p>
               {r.status === "pending" && (
                 <button

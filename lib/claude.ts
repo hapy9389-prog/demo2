@@ -33,47 +33,88 @@ const scheduleReminderTool: Anthropic.Tool = {
   name: "schedule_reminder",
   description: `사용자가 특정 미래 시점에 무언가를 알려달라고 요청했을 때 호출하세요.
 시간 계산은 하지 마세요 - 사용자가 말한 시간 표현을 그대로 구조화된 필드로만 옮기면 됩니다.
+실제 절대 날짜/시각 계산(오늘 기준 며칠 뒤인지, 연도가 몇 년인지 등)은 전부 서버가 처리합니다.
 
 가장 중요한 규칙 - 반드시 지키세요:
-- 이 도구는 오직 "방금 사용자가 보낸 메시지" 자체가 새로운 리마인더 등록 요청을 명확히 담고 있을 때만 호출하세요.
-- 대화 히스토리에 예전에 리마인더를 요청한 기록이 있다는 이유만으로 다시 호출하지 마세요. 이미 등록했거나 이미 발화(전달)된 리마인더를 재실행/재등록하지 마세요.
+- 사용자 메시지 중 <current_user_message> 태그 안의 내용만 '지금' 들어온 메시지입니다. schedule_reminder 호출 여부는 오직 이 태그 안의 내용만 근거로 판단하세요. 태그 밖(위쪽)에 있는 대화 기록은 문맥 참고용일 뿐, 리마인더 등록 근거로 쓰면 안 됩니다.
+- 이 도구는 오직 "방금 사용자가 보낸 메시지"(=<current_user_message> 태그 안) 자체가 새로운 리마인더 등록 요청을 명확히 담고 있을 때만 호출하세요.
+- 대화 히스토리에 예전에 리마인더를 요청한 기록이 있다는 이유만으로 다시 호출하지 마세요. 이미 등록했거나 이미 발화(전달)된 리마인더를 재실행/재등록하지 마세요. 리마인더가 이미 발화된 뒤 사용자가 감사 인사·일반 답장·화제 전환을 하더라도 그 과거 요청을 다시 실행하지 마세요.
 - "알려줘서 고마워", "이제 그만해", "다른 얘기하자", "아직 시간 안 지났거든" 같은, 과거 리마인더에 대한 반응/언급일 뿐 새로운 요청이 아닌 메시지에는 절대 호출하지 마세요.
 - 단, 사용자가 "다시 알려줘"처럼 명시적으로 재요청하거나 새로운 시간을 지정하면 그건 진짜 새 요청이므로 정상적으로 호출하세요.
+- "매일", "매주", "매달"처럼 반복되는 일정은 아직 지원하지 않습니다. 이런 요청이면 도구를 호출하지 말고, 반복 일정은 아직 지원하지 않는다고 캐릭터답게 자연스럽게 답하세요.
+- "어제", "지난주"처럼 이미 지난 날짜/시각을 가리키는 요청에도 호출하지 마세요.
+- 날짜만 있고 시각이 전혀 언급되지 않았다면("8월 20일에 알려줘", "내일 알려줘"처럼 시각도 "이 시간에"류 표현도 없는 경우) hour/minute을 임의로 추측해서 채우지 말고, 이 도구 자체를 호출하지 마세요. 대신 채팅 답변에서 몇 시에 알려주면 될지 캐릭터답게 되물어보세요.
+- source_text에는 반드시 <current_user_message> 태그 안에서 실제로 그대로 복사한 문구만 넣으세요(의역/요약 금지). 대화 기록(태그 밖)에 있던 문구를 넣으면 안 됩니다 — 서버가 이 문자열이 실제로 현재 메시지에 포함돼 있는지 검증하며, 통과하지 못하면 리마인더가 생성되지 않습니다.
 
-시간 표현 매핑:
+시간 표현 매핑 (계산은 절대 하지 말고 원문 그대로 아래 필드로 옮기세요):
 - "1분 뒤", "10분 있다가"처럼 지금으로부터 상대적인 시간이면 kind="relative_minutes"와 relative_minutes를 채우세요.
 - "오늘 오후 2시", "저녁 7시"처럼 오늘의 특정 시각이면 kind="time_of_day"와 hour(0-23)/minute(0-59)를 채우세요.
-- 이미 지난 시각이거나, "내일"/"다음주"처럼 오늘이 아닌 날짜이거나, "나중에"처럼 특정할 수 없는 표현이면 이 도구를 호출하지 마세요.`,
+- "내일", "모레", "3일 뒤", "일주일 뒤"처럼 오늘로부터 며칠 뒤인지로 표현되면 kind="relative_days"를 쓰세요.
+  - relative_days에는 오늘로부터 며칠 뒤인지 정수만 넣으세요(내일=1, 모레=2, "3일 뒤"=3, "일주일 뒤"=7). 요일 계산이나 실제 날짜 계산은 절대 하지 마세요.
+  - "내일 오후 2시"처럼 구체적인 시각이 같이 있으면 use_current_time=false로 두고 hour/minute을 채우세요.
+  - "내일 이 시간에", "3일 뒤 이맘때"처럼 시각을 말하지 않고 "지금과 같은 시각"을 뜻하면 use_current_time=true로 하고 hour/minute은 채우지 마세요 — 지금이 몇 시인지 당신은 정확히 모르니 추측해서 채우면 안 됩니다.
+- "8월 20일 오후 2시", "2026년 8월 20일 오후 2시"처럼 구체적인 달/일이 언급되면 kind="date_time"을 쓰고 month(1-12)/day(1-31)/hour(0-23)/minute(0-59)를 채우세요.
+  - "2026년 8월 20일"처럼 연도까지 명시됐으면 year도 채우세요. 연도가 없으면 year 필드는 아예 채우지 마세요 — 당신이 연도를 임의로 추측하면 안 됩니다. 서버가 올해/내년 중 더 가까운 미래 날짜를 자동으로 고릅니다.`,
   input_schema: {
     type: "object",
     properties: {
       kind: {
         type: "string",
-        enum: ["relative_minutes", "time_of_day"],
+        enum: ["relative_minutes", "time_of_day", "relative_days", "date_time"],
         description: "시간 표현의 종류",
       },
       relative_minutes: {
         type: "number",
         description: "kind가 relative_minutes일 때만 채움: 지금으로부터 몇 분 뒤인지",
       },
+      relative_days: {
+        type: "integer",
+        description:
+          "kind가 relative_days일 때만 채움: 오늘로부터 며칠 뒤인지(내일=1, 모레=2, '3일 뒤'=3, '일주일 뒤'=7). 실제 날짜 계산은 서버가 하므로 이 정수만 넣는다.",
+      },
+      use_current_time: {
+        type: "boolean",
+        description:
+          "kind가 relative_days일 때만 의미 있음: '이 시간에/이맘때'처럼 지금과 같은 시:분을 쓰고 싶다는 뜻이면 true(이때 hour/minute은 비워둔다). 특정 시:분을 말했다면 false.",
+      },
+      year: {
+        type: "integer",
+        description:
+          "kind가 date_time이고 사용자가 연도를 명시했을 때만 채움. 명시하지 않았으면 이 필드 자체를 넣지 않는다 — 서버가 올해/내년 중 더 가까운 미래를 자동으로 고른다.",
+      },
+      month: {
+        type: "integer",
+        description: "kind가 date_time일 때만 채움: 1-12",
+      },
+      day: {
+        type: "integer",
+        description: "kind가 date_time일 때만 채움: 1-31",
+      },
       hour: {
         type: "integer",
-        description: "kind가 time_of_day일 때만 채움: 0-23시",
+        description:
+          "kind가 time_of_day/date_time일 때, 또는 relative_days이면서 use_current_time=false일 때 채움: 0-23시",
       },
       minute: {
         type: "integer",
-        description: "kind가 time_of_day일 때만 채움: 0-59분",
+        description:
+          "kind가 time_of_day/date_time일 때, 또는 relative_days이면서 use_current_time=false일 때 채움: 0-59분",
       },
       original_phrase: {
         type: "string",
-        description: "사용자가 말한 시간 표현 원문. 예: '오늘 오후 2시', '1분 뒤'",
+        description: "사용자가 말한 시간 표현 원문. 예: '오늘 오후 2시', '1분 뒤', '내일 오후 2시'",
       },
       content: {
         type: "string",
         description: "무엇을 알려줘야 하는지 짧은 요약. 예: '물 마시기'",
       },
+      source_text: {
+        type: "string",
+        description:
+          "리마인더 요청의 근거가 된 현재 사용자 메시지(<current_user_message> 태그 안)의 정확한 원문을 그대로 복사하세요(의역/요약 금지). 서버가 이 문자열이 실제로 현재 메시지에 포함돼 있는지 검증합니다 — 대화 기록에서 가져온 문구를 넣으면 검증에 실패해 리마인더가 생성되지 않습니다.",
+      },
     },
-    required: ["kind", "original_phrase", "content"],
+    required: ["kind", "original_phrase", "content", "source_text"],
   },
 };
 
@@ -84,7 +125,10 @@ function parseExtraction(raw: unknown): ReminderExtraction | null {
   const original_phrase =
     typeof input.original_phrase === "string" ? input.original_phrase : "";
   const content = typeof input.content === "string" ? input.content : "";
-  if (!original_phrase || !content) return null;
+  const source_text = typeof input.source_text === "string" ? input.source_text : "";
+  // source_text가 비어 있으면 애초에 extraction 전체를 무효 처리한다 — 서버가 현재
+  // 메시지 근거를 검증할 수 없는 리마인더는 등록하지 않는다는 원칙(hard guard 1차 관문).
+  if (!original_phrase || !content || !source_text) return null;
 
   if (input.kind === "relative_minutes") {
     const extraction: ReminderExtraction = {
@@ -92,6 +136,7 @@ function parseExtraction(raw: unknown): ReminderExtraction | null {
       relative_minutes: Number(input.relative_minutes),
       original_phrase,
       content,
+      source_text,
     };
     return isValidExtractionShape(extraction) ? extraction : null;
   }
@@ -103,6 +148,41 @@ function parseExtraction(raw: unknown): ReminderExtraction | null {
       minute: Number(input.minute),
       original_phrase,
       content,
+      source_text,
+    };
+    return isValidExtractionShape(extraction) ? extraction : null;
+  }
+
+  if (input.kind === "relative_days") {
+    const hasHour = input.hour !== undefined && input.hour !== null;
+    const hasMinute = input.minute !== undefined && input.minute !== null;
+    const extraction: ReminderExtraction = {
+      kind: "relative_days",
+      relative_days: Number(input.relative_days),
+      use_current_time: input.use_current_time === true,
+      ...(hasHour ? { hour: Number(input.hour) } : {}),
+      ...(hasMinute ? { minute: Number(input.minute) } : {}),
+      original_phrase,
+      content,
+      source_text,
+    };
+    return isValidExtractionShape(extraction) ? extraction : null;
+  }
+
+  if (input.kind === "date_time") {
+    // year가 없을 때 Number(undefined)(=NaN)를 그대로 넣으면 resolveTriggerTime의
+    // "연도 미지정" 분기가 깨지므로, 조건부 스프레드로 필드 자체를 아예 생략해야 한다.
+    const hasYear = input.year !== undefined && input.year !== null && input.year !== "";
+    const extraction: ReminderExtraction = {
+      kind: "date_time",
+      month: Number(input.month),
+      day: Number(input.day),
+      hour: Number(input.hour),
+      minute: Number(input.minute),
+      ...(hasYear ? { year: Number(input.year) } : {}),
+      original_phrase,
+      content,
+      source_text,
     };
     return isValidExtractionShape(extraction) ? extraction : null;
   }
@@ -135,7 +215,12 @@ export async function chatWithCharacter(
     ...history.map(
       (m): Anthropic.MessageParam => ({ role: m.role, content: m.content })
     ),
-    { role: "user", content: userMessage },
+    // 마지막 user turn만 <current_user_message> 태그로 감싸 히스토리와 명확히 구분한다.
+    // Claude가 리마인더 재등록 여부를 판단할 때 "지금 들어온 메시지"가 어디까지인지
+    // 헷갈리지 않도록 하기 위함 — tool description에서도 이 태그를 근거로 판단하라고
+    // 명시한다. 저장되는 Message.content(store/UI 표시용)는 원본 userMessage 그대로이며,
+    // 이 태깅은 API 호출 시점에만 적용된다.
+    { role: "user", content: `<current_user_message>${userMessage}</current_user_message>` },
   ];
 
   const response = await anthropic.messages.create({

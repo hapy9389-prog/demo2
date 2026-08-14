@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHARACTERS, DEFAULT_CHARACTER_ID, getCharacterById } from "@/lib/characters";
-import { formatKoreanTime } from "@/lib/time";
+import { formatReminderTime } from "@/lib/time";
 import { ChatResponse, Message, ReminderCardItem, ReminderWithCharacter } from "@/types";
 import { ChatWindow } from "./ChatWindow";
 import { HomeScreen, HomeRow } from "./HomeScreen";
@@ -160,7 +160,7 @@ export function ChatApp() {
               id: data.reminderCreated!.id,
               characterId: activeCharacterId,
               content: data.reminderCreated!.content,
-              timeLabel: formatKoreanTime(new Date(data.reminderCreated!.triggerAt)),
+              timeLabel: formatReminderTime(new Date(data.reminderCreated!.triggerAt)),
               originalPhrase: data.reminderCreated!.originalPhrase,
               createdAt: data.reply.createdAt,
             },

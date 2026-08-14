@@ -36,6 +36,17 @@ export interface Message {
 /**
  * Claude가 schedule_reminder tool 호출로 반환하는 "구조화된 의도"다.
  * 실제 절대 시각 계산은 하지 않는다 — lib/time.ts의 resolveTriggerTime()이 담당.
+ *
+ * - relative_minutes: "1분 뒤" 같은 상대 분
+ * - time_of_day: "오늘 오후 2시" 같은 오늘 특정 시각
+ * - relative_days: "내일"/"모레"/"3일 뒤" 같은 상대 일수(+선택적 시각, 또는 "이 시간에")
+ * - date_time: "8월 20일 오후 2시" 같은 특정 날짜(+선택적 연도) + 시각
+ *
+ * 모든 kind는 공통으로 source_text를 갖는다 — 이 리마인더 요청의 근거가 된, 현재 사용자
+ * 메시지에서 그대로 복사한 원문(의역 금지)이다. 서버가 lib/reminderGuard.ts의
+ * isSourceTextFromCurrentMessage()로 실제 현재 메시지에 포함되는지 재검증한다. Claude가
+ * conversation history 속 과거 요청을 근거로 삼았다면(=source_text가 현재 메시지에 없다면)
+ * 리마인더 생성을 차단하기 위한 서버 측 hard guard용 필드다.
  */
 export type ReminderExtraction =
   | {
@@ -43,6 +54,7 @@ export type ReminderExtraction =
       relative_minutes: number;
       original_phrase: string;
       content: string;
+      source_text: string;
     }
   | {
       kind: "time_of_day";
@@ -50,6 +62,32 @@ export type ReminderExtraction =
       minute: number;
       original_phrase: string;
       content: string;
+      source_text: string;
+    }
+  | {
+      kind: "relative_days";
+      /** 오늘로부터 며칠 뒤인지. 내일=1, 모레=2, "3일 뒤"=3, "일주일 뒤"=7 */
+      relative_days: number;
+      /** "내일 이 시간에"처럼 시각 언급 없이 지금 시:분을 그대로 쓰고 싶다는 뜻이면 true */
+      use_current_time: boolean;
+      /** use_current_time이 false일 때만 필수 */
+      hour?: number;
+      minute?: number;
+      original_phrase: string;
+      content: string;
+      source_text: string;
+    }
+  | {
+      kind: "date_time";
+      /** 사용자가 연도를 명시했을 때만 존재. 없으면 서버가 가장 가까운 미래 연도를 선택한다. */
+      year?: number;
+      month: number;
+      day: number;
+      hour: number;
+      minute: number;
+      original_phrase: string;
+      content: string;
+      source_text: string;
     };
 
 export type CharacterAccent = "blue" | "rose";

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:time": "tsx scripts/test-time.ts",
+    "test:guard": "tsx scripts/test-reminder-guard.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
@@ -22,6 +24,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }
