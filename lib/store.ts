@@ -89,6 +89,26 @@ export function getRecentHistory(characterId: string, limit = 20): Message[] {
   return getMessagesForCharacter(characterId).slice(-limit);
 }
 
+/**
+ * 시간 인식(time awareness) 기능 전용 — characterId에게 사용자가 보낸(role: "user")
+ * 마지막 메시지 시각(ISO). 없으면 null(이 캐릭터와의 첫 대화). getRecentHistory()의
+ * limit(기본 20개)과 무관하게 전체 메시지를 스캔한다 — 리마인더 발화 메시지(role:
+ * "assistant", origin: "reminder")가 연속으로 여러 개 쌓여도 실제 마지막 사용자 메시지를
+ * 놓치지 않기 위함이다. 순수 조회 함수이며 store.messages를 절대 수정하지 않는다 —
+ * 개발 환경에서 시간 경과를 시뮬레이션하려면 이 함수를 우회하지 말고
+ * lib/devInteractionOverride.ts를 사용한다.
+ */
+export function getLastUserMessageAt(characterId: string): string | null {
+  const userMessages = getStore().messages.filter(
+    (m) => m.characterId === characterId && m.role === "user"
+  );
+  if (userMessages.length === 0) return null;
+  return userMessages.reduce(
+    (latest, m) => (m.createdAt > latest ? m.createdAt : latest),
+    userMessages[0].createdAt
+  );
+}
+
 // ---------- Reminders ----------
 
 export function addReminder(input: {

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:time": "tsx scripts/test-time.ts",
-    "test:guard": "tsx scripts/test-reminder-guard.ts"
+    "test:guard": "tsx scripts/test-reminder-guard.ts",
+    "test:interaction-time": "tsx scripts/test-interaction-time.ts",
+    "dev:set-interaction-override": "tsx scripts/dev-set-interaction-override.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

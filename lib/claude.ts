@@ -207,20 +207,33 @@ export interface ChatResult {
 export async function chatWithCharacter(
   character: Character,
   history: Message[],
-  userMessage: string
+  userMessage: string,
+  // 시간 인식(time awareness) 기능 전용, 옵션. app/api/chat/route.ts가
+  // lib/interactionTime.ts의 buildTimeAwarenessForCharacter()로 만들어 전달한다.
+  // 리마인더 관련 로직과는 완전히 무관 — 이 인자가 없어도(null) 기존 동작 그대로다.
+  timeAwarenessContext: string | null = null
 ): Promise<ChatResult> {
   const anthropic = getClient();
+
+  // 마지막 user turn만 <current_user_message> 태그로 감싸 히스토리와 명확히 구분한다.
+  // Claude가 리마인더 재등록 여부를 판단할 때 "지금 들어온 메시지"가 어디까지인지
+  // 헷갈리지 않도록 하기 위함 — tool description에서도 이 태그를 근거로 판단하라고
+  // 명시한다. 저장되는 Message.content(store/UI 표시용)는 원본 userMessage 그대로이며,
+  // 이 태깅은 API 호출 시점에만 적용된다. <time_awareness>가 있으면 같은 턴 안에서
+  // 그 앞에 붙인다 — history와는 구분되는 별도 블록이면서도, 연속된 user 역할 턴을
+  // 새로 만들지는 않는다.
+  const currentTurnContent = [
+    timeAwarenessContext,
+    `<current_user_message>${userMessage}</current_user_message>`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const messages: Anthropic.MessageParam[] = [
     ...history.map(
       (m): Anthropic.MessageParam => ({ role: m.role, content: m.content })
     ),
-    // 마지막 user turn만 <current_user_message> 태그로 감싸 히스토리와 명확히 구분한다.
-    // Claude가 리마인더 재등록 여부를 판단할 때 "지금 들어온 메시지"가 어디까지인지
-    // 헷갈리지 않도록 하기 위함 — tool description에서도 이 태그를 근거로 판단하라고
-    // 명시한다. 저장되는 Message.content(store/UI 표시용)는 원본 userMessage 그대로이며,
-    // 이 태깅은 API 호출 시점에만 적용된다.
-    { role: "user", content: `<current_user_message>${userMessage}</current_user_message>` },
+    { role: "user", content: currentTurnContent },
   ];
 
   const response = await anthropic.messages.create({

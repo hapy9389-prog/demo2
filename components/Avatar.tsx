@@ -6,6 +6,10 @@ import { Character, CharacterAccent } from "@/types";
 const ACCENT_STYLE: Record<CharacterAccent, string> = {
   blue: "bg-sky-100 text-sky-700",
   rose: "bg-rose-100 text-rose-700",
+  amber: "bg-amber-100 text-amber-700",
+  slate: "bg-slate-100 text-slate-700",
+  zinc: "bg-zinc-100 text-zinc-700",
+  violet: "bg-violet-100 text-violet-700",
 };
 
 const SIZE_CLASS = {

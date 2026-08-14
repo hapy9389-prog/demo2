@@ -90,7 +90,7 @@ export type ReminderExtraction =
       source_text: string;
     };
 
-export type CharacterAccent = "blue" | "rose";
+export type CharacterAccent = "blue" | "rose" | "amber" | "slate" | "zinc" | "violet";
 
 export interface Character {
   id: string;

@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCharacterById } from "@/lib/characters";
 import { chatWithCharacter } from "@/lib/claude";
+import { getDevInteractionOverride } from "@/lib/devInteractionOverride";
+import { buildTimeAwarenessForCharacter } from "@/lib/interactionTime";
 import { isExplicitReminderRequest, isSourceTextFromCurrentMessage } from "@/lib/reminderGuard";
-import { addMessage, addReminder, findDuplicateReminder, getRecentHistory } from "@/lib/store";
+import {
+  addMessage,
+  addReminder,
+  findDuplicateReminder,
+  getLastUserMessageAt,
+  getRecentHistory,
+} from "@/lib/store";
 import { resolveTriggerTime, validateTriggerTime } from "@/lib/time";
 import { ChatResponse } from "@/types";
 
@@ -32,6 +40,24 @@ export async function POST(req: NextRequest) {
   }
 
   const trimmedMessage = message.trim();
+
+  // ⚠️ 반드시 addMessage(user) 이전에 실행해야 한다 — 이래야 "갱신 전" lastInteractionAt
+  // 기준으로 경과 시간을 계산할 수 있다(순서를 바꾸면 gap이 항상 0이 되는 버그가 생긴다).
+  // getDevInteractionOverride는 개발 환경에서만 값을 반환하고, production에서는 항상
+  // null이라 실제 getLastUserMessageAt() 결과가 그대로 쓰인다 — 실제 메시지 데이터는
+  // 이 시간 인식 기능 어디에서도 건드리지 않는다. 리마인더 관련 로직과는 무관하다.
+  const lastInteractionAtISO =
+    getDevInteractionOverride(characterId) ?? getLastUserMessageAt(characterId);
+  const timeAwarenessContext = buildTimeAwarenessForCharacter(lastInteractionAtISO);
+  if (isDev) {
+    console.log(
+      "[time-awareness][debug] lastInteractionAtISO:",
+      lastInteractionAtISO,
+      "hasContext:",
+      timeAwarenessContext !== null
+    );
+  }
+
   const history = getRecentHistory(characterId);
 
   const userMsg = addMessage({
@@ -43,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   let chatResult;
   try {
-    chatResult = await chatWithCharacter(character, history, trimmedMessage);
+    chatResult = await chatWithCharacter(character, history, trimmedMessage, timeAwarenessContext);
   } catch (err) {
     console.error("[api/chat] Claude 호출 실패:", err);
     return NextResponse.json(
