@@ -61,8 +61,19 @@ const NOUN_DIRECTIVE_REGEX = new RegExp(
   `(?:${STANDALONE_DIRECTIVE_NOUNS.join("|")}).{0,${NOUN_ENDING_WINDOW}}(?:${DIRECTIVE_ENDINGS.join("|")})`
 );
 
+// "잔소리해줘"/"응원해줘"/"공부하라고 해줄래"처럼 특정 동사를 미리 열거하지 않고,
+// "해"+요청형 어미가 결합하는 생산적인 한국어 패턴을 통째로 인정한다. DIRECTIVE_ENDINGS를
+// 그대로 재사용하므로 "요청형 표현"의 정의 자체는 그대로 두고 "그 앞에 어떤 동사/명사가
+// 와도 된다"로만 일반화한 것 — DIRECTIVE_STEMS 중 "기억해"/"말해"/"맞이해"도 이미 "…해"로
+// 끝나므로 이 패턴의 부분집합이지만, 하위 호환을 위해 기존 DIRECTIVE_REGEX는 그대로 둔다.
+const GENERIC_HAE_DIRECTIVE_REGEX = new RegExp(`해(?:${DIRECTIVE_ENDINGS.join("|")})`);
+
 function hasReminderDirective(normalized: string): boolean {
-  return DIRECTIVE_REGEX.test(normalized) || NOUN_DIRECTIVE_REGEX.test(normalized);
+  return (
+    DIRECTIVE_REGEX.test(normalized) ||
+    NOUN_DIRECTIVE_REGEX.test(normalized) ||
+    GENERIC_HAE_DIRECTIVE_REGEX.test(normalized)
+  );
 }
 
 /**

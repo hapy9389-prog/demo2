@@ -31,7 +31,9 @@ function getClient(): Anthropic {
  */
 const scheduleReminderTool: Anthropic.Tool = {
   name: "schedule_reminder",
-  description: `사용자가 특정 미래 시점에 무언가를 알려달라고 요청했을 때 호출하세요.
+  description: `사용자가 특정 미래 시점에 무언가를 알려달라고 요청하거나, 그 시점에 캐릭터가
+특정 행동/말을 해달라고(예: "응원해줘", "잔소리 좀 해줘", "힘내라고 한마디 해줘", "깨워줘")
+요청했을 때 호출하세요 — "알려줘"류 동사로 한정하지 마세요.
 시간 계산은 하지 마세요 - 사용자가 말한 시간 표현을 그대로 구조화된 필드로만 옮기면 됩니다.
 실제 절대 날짜/시각 계산(오늘 기준 며칠 뒤인지, 연도가 몇 년인지 등)은 전부 서버가 처리합니다.
 
@@ -106,7 +108,8 @@ const scheduleReminderTool: Anthropic.Tool = {
       },
       content: {
         type: "string",
-        description: "무엇을 알려줘야 하는지 짧은 요약. 예: '물 마시기'",
+        description:
+          "무엇을 해줘야 하는지(알림 내용이든, '응원하기'/'잔소리하기'처럼 캐릭터가 할 행동/말이든) 짧은 요약. 예: '물 마시기', '응원하기'",
       },
       source_text: {
         type: "string",
