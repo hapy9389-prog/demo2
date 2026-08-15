@@ -10,6 +10,7 @@
     "test:time": "tsx scripts/test-time.ts",
     "test:guard": "tsx scripts/test-reminder-guard.ts",
     "test:interaction-time": "tsx scripts/test-interaction-time.ts",
+    "test:home-status": "tsx scripts/test-home-status.ts",
     "dev:set-interaction-override": "tsx scripts/dev-set-interaction-override.ts"
   },
   "dependencies": {

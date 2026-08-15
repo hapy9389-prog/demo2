@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHARACTERS, DEFAULT_CHARACTER_ID, getCharacterById } from "@/lib/characters";
+import { HomeRow, pickSpotlightCharacter } from "@/lib/homeStatus";
 import { formatReminderTime } from "@/lib/time";
 import { ChatResponse, Message, ReminderCardItem, ReminderWithCharacter } from "@/types";
 import { ChatWindow } from "./ChatWindow";
-import { HomeScreen, HomeRow } from "./HomeScreen";
+import { HomeScreen } from "./HomeScreen";
 import { NewMessageToast } from "./NewMessageToast";
 import { ReminderPanel } from "./ReminderPanel";
 
@@ -237,13 +238,31 @@ export function ChatApp() {
     () =>
       CHARACTERS.map((character) => {
         const characterMessages = allMessages.filter((m) => m.characterId === character.id);
+        // 서버의 getLastUserMessageAt(characterId)(lib/store.ts)와 동일한 정의를
+        // 클라이언트에서 재현한다 — role이 "user"인 메시지 중 가장 최근 createdAt.
+        const lastUserMessageAt = characterMessages.reduce<string | null>((latest, m) => {
+          if (m.role !== "user") return latest;
+          return !latest || m.createdAt > latest ? m.createdAt : latest;
+        }, null);
+        const nearestPendingReminder = reminders
+          .filter((r) => r.characterId === character.id && r.status === "pending")
+          .sort((a, b) => a.triggerAt.localeCompare(b.triggerAt))[0];
         return {
           character,
           lastMessage: characterMessages[characterMessages.length - 1],
+          lastUserMessageAt,
+          nearestPendingReminder,
           unread: unreadCharacterIds.has(character.id),
         };
       }),
-    [allMessages, unreadCharacterIds]
+    [allMessages, reminders, unreadCharacterIds]
+  );
+
+  // 홈 화면 Spotlight 대상 선정 — 판단 로직은 lib/homeStatus.ts의 순수 함수에 있고,
+  // 여기서는 현재 homeRows를 넘겨 호출만 한다.
+  const spotlight = useMemo(
+    () => pickSpotlightCharacter(homeRows, new Date(), DEFAULT_CHARACTER_ID),
+    [homeRows]
   );
 
   const pendingReminderCount = reminders.filter((r) => r.status === "pending").length;
@@ -257,6 +276,8 @@ export function ChatApp() {
         {view === "home" ? (
           <HomeScreen
             rows={homeRows}
+            spotlight={spotlight}
+            reminders={reminders}
             pendingReminderCount={pendingReminderCount}
             bellPulseTick={bellPulseTick}
             onSelect={handleSelectCharacter}

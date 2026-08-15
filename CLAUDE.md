@@ -312,8 +312,12 @@ Claude 표현:
 - 3일 ~ 7일
   → long
 
-- 7일 이상
+- 7일 ~ 30일
   → very_long
+
+- 30일 이상
+  → extremely_long (very_long보다 반응 강도를 한 단계 더 높이되, 비난·협박·과도한 집착
+    강요로 흐르지 않는다)
 
 실제 기준값의 source of truth는 `lib/interactionTime.ts`이다.
 

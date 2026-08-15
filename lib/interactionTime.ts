@@ -42,7 +42,8 @@ export const LIGHT_THRESHOLD_MINUTES = 6 * 60; // 30분~6시간: 가벼운 인�
 export const NOTABLE_THRESHOLD_MINUTES = 24 * 60; // 6~24시간: "오늘 바빴어?" 정도
 export const SEVERAL_DAYS_THRESHOLD_MINUTES = 3 * 24 * 60; // 1~3일: 꽤 오랜만 인식
 export const LONG_ABSENCE_THRESHOLD_MINUTES = 7 * 24 * 60; // 3~7일: 적극적 반응
-// >=7일(LONG_ABSENCE_THRESHOLD_MINUTES 이상): 강한 복귀 반응
+// 7일~30일: 강한 복귀 반응(very_long)
+export const EXTREMELY_LONG_THRESHOLD_MINUTES = 30 * 24 * 60; // >=30일: 한 단계 더 강한 반응
 
 export type InteractionRelevanceTier =
   | "none"
@@ -50,7 +51,8 @@ export type InteractionRelevanceTier =
   | "notable"
   | "several_days"
   | "long"
-  | "very_long";
+  | "very_long"
+  | "extremely_long";
 
 export function getInteractionRelevanceTier(gap: InteractionGap): InteractionRelevanceTier {
   const m = gap.totalMinutes;
@@ -59,7 +61,8 @@ export function getInteractionRelevanceTier(gap: InteractionGap): InteractionRel
   if (m < NOTABLE_THRESHOLD_MINUTES) return "notable";
   if (m < SEVERAL_DAYS_THRESHOLD_MINUTES) return "several_days";
   if (m < LONG_ABSENCE_THRESHOLD_MINUTES) return "long";
-  return "very_long";
+  if (m < EXTREMELY_LONG_THRESHOLD_MINUTES) return "very_long";
+  return "extremely_long";
 }
 
 /** "2026-08-14 21:30 KST" 형식. lib/time.ts와 동일하게 Intl 없이 순수 Date getter만 사용. */
@@ -89,6 +92,10 @@ const TIER_GUIDANCE: Record<Exclude<InteractionRelevanceTier, "none">, string> =
   several_days: "꽤 오랜만이라는 사실을 인식할 만합니다.",
   long: "적극적으로 오랜만이라는 반응을 보일 수 있습니다.",
   very_long: "강한 복귀 반응을 보여도 좋습니다. 캐릭터 성격이 확실히 드러나게 하세요.",
+  extremely_long:
+    "이번엔 특히 오래 비어 있었던 시간입니다. very_long보다 한 단계 더 놀람·서운함·걱정·반가움 중 " +
+    "캐릭터에게 어울리는 감정을 뚜렷하게 드러내세요. 단, 사용자를 비난하거나 다그치지 말고, " +
+    "위협·협박이나 과도한 집착을 강요하는 표현으로 흐르지 않게 하세요.",
 };
 
 /**

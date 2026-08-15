@@ -1,21 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Character, CharacterAccent } from "@/types";
-
-const ACCENT_STYLE: Record<CharacterAccent, string> = {
-  blue: "bg-sky-100 text-sky-700",
-  rose: "bg-rose-100 text-rose-700",
-  amber: "bg-amber-100 text-amber-700",
-  slate: "bg-slate-100 text-slate-700",
-  zinc: "bg-zinc-100 text-zinc-700",
-  violet: "bg-violet-100 text-violet-700",
-};
+import { Character } from "@/types";
+import { ACCENT_AVATAR_STYLE } from "@/lib/accentColors";
 
 const SIZE_CLASS = {
   sm: "h-8 w-8 text-base",
   md: "h-11 w-11 text-xl",
   lg: "h-14 w-14 text-2xl",
+  xl: "h-24 w-24 text-4xl",
+  // 부모 컨테이너 크기를 그대로 채운다 — CharacterCard처럼 반응형 정사각 배너로 쓸 때(shape="square").
+  fill: "h-full w-full text-5xl",
 } as const;
 
 type AvatarCharacter = Pick<Character, "name" | "emoji" | "image" | "accent">;
@@ -23,15 +18,22 @@ type AvatarCharacter = Pick<Character, "name" | "emoji" | "image" | "accent">;
 /**
  * 캐릭터 아바타 공용 컴포넌트. character.image가 있으면 이미지를 우선 표시하고,
  * 이미지가 없거나(필드 미지정) 로드에 실패하면(onError) emoji+accent 배경으로 자동 폴백한다.
- * 홈 화면 목록/채팅 헤더/메시지 버블 3곳에서 공용으로 쓴다.
+ * 홈 화면 Spotlight/그리드 카드/채팅 헤더/메시지 버블에서 공용으로 쓴다.
  */
 export function Avatar({
   character,
   size = "md",
+  shape = "circle",
   emphasize = false,
 }: {
   character: AvatarCharacter;
   size?: keyof typeof SIZE_CLASS;
+  /**
+   * "circle"(기본) = 원형 아바타. "square" = 모서리를 두지 않는다(각짐) — 홈 화면 카드처럼
+   * 감싸는 쪽이 자체적으로 `overflow-hidden rounded-t-2xl`로 모서리를 잘라내는 용도라,
+   * 반경 값을 두 곳에서 따로 정의하지 않기 위해 Avatar 자체는 각지게 둔다.
+   */
+  shape?: "circle" | "square";
   /** 리마인더 발화처럼 "먼저 연락했다"는 느낌을 강조하고 싶을 때 은은한 링 효과 */
   emphasize?: boolean;
 }) {
@@ -40,8 +42,10 @@ export function Avatar({
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-full ${SIZE_CLASS[size]} ${
-        showImage ? "bg-neutral-100" : ACCENT_STYLE[character.accent]
+      className={`relative shrink-0 overflow-hidden ${
+        shape === "square" ? "rounded-none" : "rounded-full"
+      } ${SIZE_CLASS[size]} ${
+        showImage ? "bg-neutral-100" : ACCENT_AVATAR_STYLE[character.accent]
       } ${emphasize ? "ring-2 ring-amber-300 ring-offset-2" : ""}`}
     >
       {showImage ? (

@@ -8,6 +8,7 @@
  * 검토 확인 + 실제 앱에서 scripts/dev-set-interaction-override.ts로 수동 확인한다.
  */
 import {
+  EXTREMELY_LONG_THRESHOLD_MINUTES,
   InteractionGap,
   InteractionRelevanceTier,
   LIGHT_THRESHOLD_MINUTES,
@@ -87,12 +88,28 @@ checkGapAndTier("E. 5일 전 → 3~7일(long)", minutesAgo(5 * 24 * 60), {
   totalMinutes: 7200,
   tier: "long",
 });
-checkGapAndTier("F. 8일 3시간 40분 전 → 7일 이상(very_long), days/hours/minutes 정확히", minutesAgo(8 * 24 * 60 + 3 * 60 + 40), {
+checkGapAndTier("F. 8일 3시간 40분 전 → 7~30일(very_long), days/hours/minutes 정확히", minutesAgo(8 * 24 * 60 + 3 * 60 + 40), {
   totalMinutes: 11740,
   days: 8,
   hours: 3,
   minutes: 40,
   tier: "very_long",
+});
+checkGapAndTier("G. 35일 전 → 30일 이상(extremely_long)", minutesAgo(35 * 24 * 60), {
+  totalMinutes: 35 * 24 * 60,
+  days: 35,
+  tier: "extremely_long",
+});
+
+console.log("\n--- 8일 vs 30일: 서로 다른 tier여야 한다(반응 강도 차이의 전제) ---");
+check("8일 전과 30일 전은 서로 다른 tier(very_long vs extremely_long)", () => {
+  const eightDays = getInteractionRelevanceTier(calculateInteractionGap(minutesAgo(8 * 24 * 60), NOW));
+  const thirtyDays = getInteractionRelevanceTier(calculateInteractionGap(minutesAgo(30 * 24 * 60), NOW));
+  assertEqual(eightDays, "very_long", "8일 tier");
+  assertEqual(thirtyDays, "extremely_long", "30일 tier");
+  if (eightDays === thirtyDays) {
+    throw new Error("8일과 30일의 tier가 같으면 안 됨(반응 강도가 벌어지지 않음)");
+  }
 });
 
 console.log("\n--- 경계값 쌍(off-by-one 방지) ---");
@@ -102,6 +119,7 @@ const boundaries: Array<[number, InteractionRelevanceTier, InteractionRelevanceT
   [NOTABLE_THRESHOLD_MINUTES, "notable", "several_days"],
   [SEVERAL_DAYS_THRESHOLD_MINUTES, "several_days", "long"],
   [LONG_ABSENCE_THRESHOLD_MINUTES, "long", "very_long"],
+  [EXTREMELY_LONG_THRESHOLD_MINUTES, "very_long", "extremely_long"],
 ];
 for (const [threshold, beforeTier, atTier] of boundaries) {
   checkGapAndTier(`${threshold - 1}분 전(경계 -1) → ${beforeTier}`, minutesAgo(threshold - 1), {
