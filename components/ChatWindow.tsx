@@ -14,6 +14,7 @@ export function ChatWindow({
   character,
   messages,
   reminderCards,
+  bellPulseTick,
   onSend,
   sending,
   error,
@@ -23,6 +24,8 @@ export function ChatWindow({
   character: Character;
   messages: Message[];
   reminderCards: ReminderCardItem[];
+  /** 리마인더/proactive 메시지가 도착할 때마다 증가 — ChatHeader의 bell 강조 애니메이션에 그대로 전달. */
+  bellPulseTick: number;
   onSend: (text: string) => void;
   sending: boolean;
   error: string | null;
@@ -65,7 +68,12 @@ export function ChatWindow({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-neutral-50">
-      <ChatHeader character={character} onBack={onBack} onOpenReminders={onOpenReminders} />
+      <ChatHeader
+        character={character}
+        bellPulseTick={bellPulseTick}
+        onBack={onBack}
+        onOpenReminders={onOpenReminders}
+      />
 
       <div className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
         {timeline.length === 0 && (

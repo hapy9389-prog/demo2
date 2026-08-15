@@ -42,8 +42,8 @@ export function ReminderPanel({
         className="absolute inset-0 animate-fade-in bg-black/30"
       />
       <div className="relative z-10 flex max-h-[70%] animate-sheet-up flex-col rounded-t-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-neutral-700">🔔 등록된 리마인더</h2>
+        <div className="flex items-center justify-between border-b border-amber-100 bg-amber-50/40 px-4 py-3">
+          <h2 className="text-sm font-semibold text-amber-700">🔔 등록된 리마인더</h2>
           <button
             onClick={onClose}
             aria-label="닫기"

@@ -14,11 +14,14 @@ export interface HomeRow {
 export function HomeScreen({
   rows,
   pendingReminderCount,
+  bellPulseTick,
   onSelect,
   onOpenReminders,
 }: {
   rows: HomeRow[];
   pendingReminderCount: number;
+  /** 리마인더/proactive 메시지가 도착할 때마다 증가 — bell 아이콘 강조 애니메이션 재생용. */
+  bellPulseTick: number;
   onSelect: (characterId: string) => void;
   onOpenReminders: () => void;
 }) {
@@ -29,11 +32,16 @@ export function HomeScreen({
         <button
           onClick={onOpenReminders}
           aria-label="리마인더 목록 열기"
-          className="relative flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-lg transition-colors hover:bg-neutral-200"
+          className="relative flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-lg text-amber-600 transition-colors hover:bg-amber-100"
         >
-          🔔
+          <span
+            key={bellPulseTick}
+            className={bellPulseTick > 0 ? "inline-block animate-bell-ring" : "inline-block"}
+          >
+            🔔
+          </span>
           {pendingReminderCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
               {pendingReminderCount}
             </span>
           )}
@@ -45,17 +53,26 @@ export function HomeScreen({
           <button
             key={character.id}
             onClick={() => onSelect(character.id)}
-            className="flex w-full items-center gap-3 border-b border-neutral-100 px-4 py-3 text-left transition-colors hover:bg-neutral-50 active:bg-neutral-100"
+            className={`flex w-full items-center gap-3 border-b border-neutral-100 px-4 py-3 text-left transition-colors hover:bg-rose-50/60 active:bg-rose-100/70 ${
+              unread ? "bg-amber-50/70" : ""
+            }`}
           >
             <Avatar character={character} size="lg" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-neutral-900">{character.name}</span>
                 {unread && (
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" aria-hidden />
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full bg-amber-500 ring-2 ring-amber-200"
+                    aria-hidden
+                  />
                 )}
               </div>
-              <p className="truncate text-sm text-neutral-500">
+              <p
+                className={`truncate text-sm ${
+                  unread ? "font-medium text-neutral-700" : "text-neutral-500"
+                }`}
+              >
                 {lastMessage ? lastMessage.content : character.tagline}
               </p>
             </div>

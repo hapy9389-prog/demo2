@@ -35,6 +35,9 @@ export function ChatApp() {
   // 홈 화면 행에 "아직 안 열어본 새 리마인더 발화가 있다"는 점을 찍기 위한 최소 버전
   // (핵심 UI가 먼저이므로, 상태 하나만 추가하는 선에서 최소 구현)
   const [unreadCharacterIds, setUnreadCharacterIds] = useState<Set<string>>(new Set());
+  // 리마인더/proactive 메시지가 도착할 때마다 증가시켜, 현재 보이는 bell 아이콘이
+  // 그 순간에만 짧게 강조 애니메이션을 재생하도록 하는 트리거 카운터.
+  const [bellPulseTick, setBellPulseTick] = useState(0);
 
   // 마지막으로 확인한 메시지의 서버 createdAt. 클라이언트 시계가 아니라 서버가 준
   // 값을 기준으로 폴링해야 서버-클라이언트 시계 오차에 영향을 받지 않는다.
@@ -42,6 +45,21 @@ export function ChatApp() {
   const initializedRef = useRef(false);
   const titleTimerRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  // 폰 프레임 전체 진동 효과 대상. 이 div는 앱 전체를 감싸므로 React key로
+  // 리마운트시키면 자식들의 state(스크롤 위치, 입력 중 텍스트 등)가 날아간다 —
+  // 그래서 classList를 직접 조작해 리마운트 없이 애니메이션을 재시작한다.
+  const frameRef = useRef<HTMLDivElement>(null);
+
+  // 리마인더/proactive 메시지가 도착했을 때만 호출한다(일반 채팅 응답에는 호출하지 않음).
+  const triggerReminderArrivalEffect = useCallback(() => {
+    const el = frameRef.current;
+    if (el) {
+      el.classList.remove("animate-phone-shake");
+      void el.offsetWidth; // 강제 리플로우: 같은 클래스를 다시 추가해도 애니메이션이 재생되게 함
+      el.classList.add("animate-phone-shake");
+    }
+    setBellPulseTick((t) => t + 1);
+  }, []);
 
   const refreshReminders = useCallback(async () => {
     try {
@@ -110,6 +128,7 @@ export function ChatApp() {
             const name = character?.name ?? "캐릭터";
             showToast(`${name}에게 새 메시지가 왔습니다`);
             flashTitleFor(name);
+            triggerReminderArrivalEffect();
 
             const isViewingThisCharacter =
               view === "chat" && activeCharacterId === reminderMsg.characterId;
@@ -125,7 +144,14 @@ export function ChatApp() {
     }, POLL_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [activeCharacterId, flashTitleFor, refreshReminders, showToast, view]);
+  }, [
+    activeCharacterId,
+    flashTitleFor,
+    refreshReminders,
+    showToast,
+    triggerReminderArrivalEffect,
+    view,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -224,11 +250,15 @@ export function ChatApp() {
 
   return (
     <div className="min-h-screen w-full bg-white sm:flex sm:items-center sm:justify-center sm:bg-neutral-200 sm:p-6">
-      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-[844px] sm:max-h-[92vh] sm:max-w-[420px] sm:rounded-[2.5rem] sm:border-[8px] sm:border-neutral-900 sm:shadow-2xl">
+      <div
+        ref={frameRef}
+        className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-[844px] sm:max-h-[92vh] sm:max-w-[420px] sm:rounded-[2.5rem] sm:border-[8px] sm:border-neutral-900 sm:shadow-2xl"
+      >
         {view === "home" ? (
           <HomeScreen
             rows={homeRows}
             pendingReminderCount={pendingReminderCount}
+            bellPulseTick={bellPulseTick}
             onSelect={handleSelectCharacter}
             onOpenReminders={() => setReminderSheetOpen(true)}
           />
@@ -237,6 +267,7 @@ export function ChatApp() {
             character={activeCharacter}
             messages={activeMessages}
             reminderCards={activeReminderCards}
+            bellPulseTick={bellPulseTick}
             onSend={handleSend}
             sending={sending}
             error={error}
